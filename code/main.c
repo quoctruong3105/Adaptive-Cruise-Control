@@ -1,0 +1,495 @@
+#include <mega328p.h>
+#include <alcd.h>
+#include <delay.h>
+#include <stdio.h>
+
+#define CRUISE_BTN PIND.2
+#define ADAPTIVE_BTN PIND.2
+#define RES_BTN PINC.2
+#define CANCEL_BTN PINC.3
+#define SET_BTN PINC.4
+#define GAS_PEDAL PINC.0
+#define BRAKE_PEDAL PINC.1
+#define ECHO_PORT PORTB.0
+#define TRIGGER_PORT PORTB.1
+#define ON 0
+
+char mode = 'n'; // There are 3 modes: a <-> adaptive cruise control, c <-> cruise control, n <-> normal
+char status = 'i'; // Status of mode cruise control or adaptive cruise control, it can be i<->initial, w <-> waiting and s <-> set
+unsigned int dem = 0, gapLevel = 0;
+unsigned int speed, speedTemp;
+float distance;
+int timerOverFlow = 0;
+
+void wheelAndThrottleControl();
+void brakeLightControl();
+void showLCD(unsigned int);
+void activeRadar();
+void reIncre();
+
+interrupt [TIM1_OVF] void timer1_ovf_isr(void)
+{
+    timerOverFlow++;
+}
+
+interrupt [PC_INT1] void pin_change_isr1(void)
+{   
+    if(SET_BTN == ON && status == 'i' && speed >= 45)
+    {   
+        speedTemp = speed;
+        status = 's';  
+        wheelAndThrottleControl();
+        brakeLightControl();
+        showLCD(speed);
+        delay_ms(200);   
+    }
+    else if(RES_BTN == ON && mode == 'c' && status == 'w')
+    {
+        status = 's';
+        reIncre();
+    } 
+    else if(RES_BTN == ON && mode == 'a' && status == 'w')
+    {   
+        if(distance < 100)
+        {
+            status = 's'; 
+        }
+        else
+        {                
+            status = 's';
+            reIncre();
+        }
+    }
+}
+
+// Active cruise control mode
+interrupt [EXT_INT0] void ext_int0_isr(void)
+{
+     if(dem == 0)
+     {
+          mode = 'c';
+     }
+     else
+     {
+          mode = 'n';
+          status = 'i';
+     }
+     dem++;
+     if(dem == 2)
+     {
+          dem = 0;
+     }
+}
+
+// Active adaptive cruise control mode
+interrupt [EXT_INT1] void ext_int1_isr(void)
+{
+    if(mode == 'c' && status != 'i')
+    {
+        mode = 'a';  
+    }  
+    gapLevel++;
+    if(gapLevel == 4)
+    {    
+        gapLevel = 0;  
+        mode = 'c'; 
+    }
+}
+
+void activeRadar()
+{
+    unsigned int duration;
+    // Trigger generate pulse
+    TRIGGER_PORT = 1;
+    delay_us(10);
+    TRIGGER_PORT = 0;
+    // Delete timer1
+    TCNT1H = 0;
+    TCNT1L = 0;
+    TCCR1B=0b01000001; // Catch rising edge mode
+    TIFR1 = 0b00100001; // Delete input capture and overflow flag
+
+    // Compute pulse width
+    while(TIFR1 & (1 << ICF1) == 0); // Waiting rising edge
+    // Delete timer1
+    TCNT1H = 0;
+    TCNT1L = 0;
+    TCCR1B=0b00000001; // Catch falling edge mode
+    TIFR1 = 0b00100001; // Delete input capture and overflow flag
+    timerOverFlow = 0; // Delete timer1 value
+
+    while(TIFR1 & (1 << ICF1) == 0); // Waiting falling edge
+    duration = (ICR1L + ICR1H*256) + (65535 * timerOverFlow);
+    distance = 1.0f*duration/466.47;   
+}
+
+void showLCD(unsigned int speed)
+{
+    char buffer[16], buffer1[16];
+    lcd_clear();
+    sprintf(buffer, "SPD: %d km/h", speed);
+    lcd_gotoxy(0,0);
+    lcd_puts(buffer);
+
+    if(mode == 'a')
+    {  
+        lcd_gotoxy(0,1);
+        lcd_puts("MODE: ACC");
+        lcd_gotoxy(0,2);
+        lcd_puts("GAP: ");
+        if(gapLevel == 1)
+        {
+            lcd_putchar('|');
+        }
+        else if(gapLevel == 2)
+        {
+            lcd_puts("||");
+        }
+        else if(gapLevel == 3)
+        {
+            lcd_puts("|||");
+        }    
+        lcd_gotoxy(0,3);
+        sprintf(buffer1, "DIS: %0.2f m", distance);
+        lcd_puts(buffer1);
+    }
+    else if(mode == 'c')
+    {  
+        lcd_gotoxy(0,1);
+        lcd_puts("MODE: CC");
+        lcd_gotoxy(0,2);
+        if(status == 'i')
+        {
+            lcd_puts("SET TO ACTIVE");
+        }
+        else if(status == 'w')
+        {
+            lcd_puts("STATUS: PAUSE");
+        }
+        else
+        {
+            lcd_puts("STATUS: ACTIVE");
+        }
+    }
+    else
+    {      
+        lcd_gotoxy(0,1);
+        lcd_puts("MODE: NORMAL");
+    }
+}
+
+void normalMode()
+{
+    if(GAS_PEDAL == ON && speed < 200)
+    {
+        if(speed < 30)
+        {
+            speed+=2;
+        }
+        else
+        {
+            speed++;
+        }
+    }
+    else if(BRAKE_PEDAL == ON && speed > 0)
+    {
+        if(speed > 120)
+        {
+            speed-=20;
+        }
+        else if(speed > 80 && speed < 120)
+        {
+            speed-=10;
+        }
+        else if(speed > 20 && speed < 80)
+        {
+            speed-=5;
+        }
+        else
+        {
+            speed--;
+        }
+    }
+    else
+    {
+        if(speed > 0)
+        {
+            speed--;
+            delay_ms(1000);
+        }
+    }
+    showLCD(speed);
+    wheelAndThrottleControl();
+    brakeLightControl();
+    delay_ms(200);
+}
+
+void reIncre()
+{
+    while(speed != speedTemp)
+    {
+        if(speed > speedTemp)
+        {
+            speed--;
+            delay_ms(500);
+            wheelAndThrottleControl();
+            brakeLightControl();
+            showLCD(speed);  
+            if(CANCEL_BTN == ON || BRAKE_PEDAL == ON)
+            {                                                                   
+                status = 'w';
+                break;
+            }   
+        }
+        else
+        {
+            speed++;
+            delay_ms(500);
+            wheelAndThrottleControl();
+            brakeLightControl();
+            showLCD(speed);
+            if(CANCEL_BTN == ON || BRAKE_PEDAL == ON)
+            {                                                                   
+                status = 'w';
+                break;
+            }
+        }
+    }
+}
+
+void cruiseControlMode()
+{
+    // This mode initially operate same as normal mode
+    if(status == 'i')
+    {  
+        normalMode();
+    }
+    // When set button is pressed speed is locked, +/-/cancel buttons are actived
+    if(status == 's')
+    {                           
+        int i;
+        if(RES_BTN == ON)
+        {
+            if((200 - speed) >= 5)
+            {
+                for(i = 0; i < 5; i++)
+                {
+                    speed++;
+                    delay_ms(400);
+                    wheelAndThrottleControl();
+                    brakeLightControl();
+                    showLCD(speed);
+                    speedTemp = speed;
+                }
+            }
+            else
+            {
+                while(speed < 200)
+                {
+                    speed++;
+                    delay_ms(400);
+                    wheelAndThrottleControl();
+                    brakeLightControl();
+                    showLCD(speed); 
+                    speedTemp = speed;
+                }    
+            }
+        }
+        else if(SET_BTN == ON)
+        {
+            if((speed - 5) >= 45)
+            {
+                for(i = 0; i < 5; i++)
+                {
+                    speed--;
+                    delay_ms(600);
+                    wheelAndThrottleControl();
+                    brakeLightControl();
+                    showLCD(speed);  
+                    speedTemp = speed;
+                }   
+            }
+            else
+            {
+                while(speed > 45)
+                {
+                    speed--;
+                    delay_ms(600);
+                    wheelAndThrottleControl();
+                    brakeLightControl();
+                    showLCD(speed); 
+                    speedTemp = speed;
+                } 
+            }
+        }
+        else if(CANCEL_BTN == ON || BRAKE_PEDAL == ON)
+        {
+            status = 'w';    
+        }  
+        else
+        {
+            wheelAndThrottleControl();
+            brakeLightControl();
+            showLCD(speed);   
+            delay_ms(200); 
+        }
+    }
+    // The mode will be paused and operated as normal mode when cancel button or brake pedal is pressed
+    if(status == 'w')
+    {
+        normalMode();
+    }    
+}
+
+void wheelAndThrottleControl()
+{
+    if(speed == 0)
+    {
+        DDRD.5 = 0;
+        DDRD.6 = 0;
+    }
+    else
+    {
+        DDRD.5 = 1;
+        DDRD.6 = 1;
+        OCR0B = speed*4*60/200; // Speed of wheel
+        OCR0A = 32*(0.005*speed + 0.5) - 1; // Angle position of throttle
+    }
+}
+
+void brakeLightControl()
+{
+    if(BRAKE_PEDAL == ON)
+    {
+        PORTB.2 = 1;
+    }
+    else
+    {
+        PORTB.2 = 0;
+    }
+}
+
+int getGap(unsigned int gapLevel)
+{
+    if(gapLevel == 1)
+    {
+        return 30;    
+    }            
+    else if(gapLevel == 2)
+    {
+        return 50;
+    }            
+    else
+    {
+        return 70;
+    }
+}
+
+void keepGap()
+{
+    if(status == 's' || status == 'i')
+    {    
+        if((distance < (getGap(gapLevel) - 6)) && speed > 0)
+        {     
+            speed--;
+        }    
+        else if((distance > getGap(gapLevel) + 6) && speed < 200)
+        {
+            speed++;
+        }       
+        if(CANCEL_BTN == ON || BRAKE_PEDAL == ON)
+        {  
+            status = 'w';
+            speedTemp = speed;
+        } 
+        wheelAndThrottleControl();
+        brakeLightControl();
+        showLCD(speed);  
+        delay_ms(1000);   
+    }   
+    if(status == 'w')
+    {
+        normalMode();
+    } 
+}
+
+void main(void)
+{
+
+// Crystal Oscillator division factor: 1
+#pragma optsize-
+CLKPR=0x80;
+CLKPR=0x00;
+#ifdef _OPTIMIZE_SIZE_
+#pragma optsize+
+#endif
+
+// Timer/Counter 0 initialization
+TCCR0A=0b10100011;
+TCCR0B=0b00000100;
+
+// Timer/Counter 1 initialization
+TCCR1A=0x00; // Normal mode
+TIMSK1=0b00000001; // Allow interrupt when timer1 overflow
+
+// Timer/Counter 2 initialization
+TCCR2B=0b00000101;
+
+// External Interrupt(s) initialization
+EICRA=0x0A;
+EIMSK=0x03;
+EIFR=0x03;
+PCICR=0x02;
+PCMSK1=0x1F;
+PCIFR=0x02;
+
+// Alphanumeric LCD initialization
+lcd_init(16);
+
+// Set up for all Button
+PORTC = 0xff;
+PORTD.2 = 1;
+PORTD.3 = 1;
+
+// Set up for ultrasonic sensor
+DDRB.0 = 0;
+DDRB.1 = 1;
+
+// Set up for brake light
+DDRB.2 = 1;
+PORTB.2 = 0;
+
+// Global enable interrupts
+#asm("sei")
+
+while (1)
+      {  
+        // Cruise control mode
+        if(mode == 'c')
+        {  
+            cruiseControlMode(); 
+        }    
+        // Adaptive cruise control mode
+        if(mode == 'a')
+        {    
+            activeRadar(); 
+            if(distance > 100)
+            {   
+                if(status == 's')
+                {
+                    reIncre();    
+                } 
+                cruiseControlMode();
+            }   
+            else
+            {   
+                keepGap();
+            }
+        }
+        // Normal mode
+        if(mode == 'n')
+        {
+            normalMode();
+        }
+      }
+}
