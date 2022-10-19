@@ -4,8 +4,8 @@
 + Tools: Proteus, Codevision
 + Tasks: Simulate circuit diagram on Proteus, build code in Codevision and load hex file to AVR microcontroller, test system and debug,...
 + Knowledge used in this project:
-  - Microcontroller: 
-  - C language: 
+  - Microcontroller: External interrupts, Timer0(fastPWM), Timer1(input capture), declaring registers.
+  - C language: if-else structure, loop, pass by value function, void functions, value-returning function. 
 + Working principle: 
   - Normal mode: increase/decrease speed depending on accelerator and brake pedals.
   - Cruise Control mode: The speed is set by the Set button, after the speed has been set, it can be changed by the (+)/(-) button. If the Cancel button is pressed or     the brake pedal is pressed, the system will temporarily return to normal mode, press the Res button to return the vehicle to the previously set speed.
