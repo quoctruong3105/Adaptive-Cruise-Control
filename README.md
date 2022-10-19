@@ -1,5 +1,8 @@
 # Adaptive-Cruise-Control
 + Note:
+  - Wheel Distances measured in the project are for illustrative purposes only.
+  - Wheel speed and throttle opening angle are for illustrative purposes only.
+  - The ACC mode that controls the speed according to the distance to the vehicle in front programmed in this project is simplified, it only steadily increases/decreases   1 km/h at a time when it is outside the desired range, so It is for illustration purposes only.
 + This is a self-study project to improve C programming skills and AVR microcontroller knowledge.
 + Tools: Proteus, Codevision
 + Tasks: Simulate circuit diagram on Proteus, build code in Codevision and load hex file to AVR microcontroller, test system and debug,...
