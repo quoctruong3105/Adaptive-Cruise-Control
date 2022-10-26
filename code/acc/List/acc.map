@@ -1,0 +1,72 @@
+RAM Allocation [bytes]
+Variable                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+timerOverFlow                                                                     0x0358       2
+data                                                                              0x035A       1
+rx_buffer0                                                                        0x035B       8
+rx_wr_index0                                                                      0x0363       1
+rx_rd_index0                                                                      0x0364       1
+rx_counter0                                                                       0x0365       1
+tx_buffer0                                                                        0x0366       8
+tx_wr_index0                                                                      0x036E       1
+tx_rd_index0                                                                      0x036F       1
+tx_counter0                                                                       0x0370       1
+_base_y                                                                           0x0371       4
+_lcd_x                                                                            0x0375       1
+_lcd_y                                                                            0x0376       1
+_lcd_maxx                                                                         0x0377       1
+_seed                                                                             0x0378       4
+
+EEPROM Allocation [bytes]
+Variable                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+
+Register Allocation
+Variable                                                                          Register  Size
+------------------------------------------------------------------------------------------------
+mode                                                                              R4           1
+status                                                                            R3           1
+dem                                                                               R5,R6        2
+gapLevel                                                                          R7,R8        2
+speed                                                                             R9,R10       2
+speedTemp                                                                         R11,R12      2
+distance                                                                          R13,R14      2
+rx_buffer_overflow0                                                               GPIOR0.0  1bit
+
+FLASH Allocation [words]
+Function                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+usart_rx_isr                                                                      0x000D6     45
+getchar                                                                           0x00103     32
+usart_tx_isr                                                                      0x00123     37
+timer1_ovf_isr                                                                    0x00148     17
+pin_change_isr1                                                                   0x00159     87
+ext_int0_isr                                                                      0x001B0     32
+ext_int1_isr                                                                      0x001D0     31
+activeRadar                                                                       0x001EF     66
+showLCD                                                                           0x00231    117
+normalMode                                                                        0x002A6     88
+reIncre                                                                           0x002FE     35
+cruiseControlMode                                                                 0x00321    115
+wheelAndThrottleControl                                                           0x00394     52
+brakeLightControl                                                                 0x003C8      6
+keepGap                                                                           0x003E1     60
+receiveFromUser                                                                   0x0041D      3
+main                                                                              0x00420     87
+_lcd_write_nibble_G100                                                            0x00477     37
+_lcd_write_data                                                                   0x0049C     12
+lcd_gotoxy                                                                        0x004A8     17
+lcd_clear                                                                         0x004B9     14
+lcd_putchar                                                                       0x004C7     32
+lcd_puts                                                                          0x004E7     17
+lcd_init                                                                          0x004F8     48
+put_buff_G101                                                                     0x00528     58
+_ftoe_G101                                                                        0x00562    212
+_print_G101                                                                       0x00636    538
+sprintf                                                                           0x00850     52
+strcpyf                                                                           0x00884     13
+strlen                                                                            0x00891     12
+strlenf                                                                           0x0089D     13
+ftrunc                                                                            0x008AA     49
+floor                                                                             0x008DB     23
+ftoa                                                                              0x008F2    160

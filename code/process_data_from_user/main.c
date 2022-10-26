@@ -1,0 +1,133 @@
+#include <mega328p.h>
+#include <delay.h>
+
+#define BTN_DDR DDRC
+#define BTN_PORT PORTC
+#define SET_PORT PORTC.0
+#define RES_PORT PORTC.1
+#define CANCEL_PORT PORTC.2
+#define CC_PORT PORTC.3
+#define ACC_PORT PORTC.4
+
+#define DATA_REGISTER_EMPTY (1<<UDRE0)
+#define RX_COMPLETE (1<<RXC0)
+#define FRAMING_ERROR (1<<FE0)
+#define PARITY_ERROR (1<<UPE0)
+#define DATA_OVERRUN (1<<DOR0)
+
+unsigned char data;
+
+// USART Receiver buffer
+#define RX_BUFFER_SIZE0 8
+char rx_buffer0[RX_BUFFER_SIZE0];
+
+#if RX_BUFFER_SIZE0 <= 256
+unsigned char rx_wr_index0=0,rx_rd_index0=0;
+#else
+unsigned int rx_wr_index0=0,rx_rd_index0=0;
+#endif
+
+#if RX_BUFFER_SIZE0 < 256
+unsigned char rx_counter0=0;
+#else
+unsigned int rx_counter0=0;
+#endif
+
+// This flag is set on USART Receiver buffer overflow
+bit rx_buffer_overflow0;
+
+// USART Receiver interrupt service routine
+interrupt [USART_RXC] void usart_rx_isr(void)
+{
+char status,data;
+status=UCSR0A;
+data=UDR0;
+if ((status & (FRAMING_ERROR | PARITY_ERROR | DATA_OVERRUN))==0)
+   {
+   rx_buffer0[rx_wr_index0++]=data;
+#if RX_BUFFER_SIZE0 == 256
+   // special case for receiver buffer size=256
+   if (++rx_counter0 == 0) rx_buffer_overflow0=1;
+#else
+   if (rx_wr_index0 == RX_BUFFER_SIZE0) rx_wr_index0=0;
+   if (++rx_counter0 == RX_BUFFER_SIZE0)
+      {
+      rx_counter0=0;
+      rx_buffer_overflow0=1;
+      }
+#endif
+   }
+}
+
+#ifndef _DEBUG_TERMINAL_IO_
+// Get a character from the USART Receiver buffer
+#define _ALTERNATE_GETCHAR_
+#pragma used+
+char getchar(void)
+{
+char data;
+while (rx_counter0==0);
+data=rx_buffer0[rx_rd_index0++];
+#if RX_BUFFER_SIZE0 != 256
+if (rx_rd_index0 == RX_BUFFER_SIZE0) rx_rd_index0=0;
+#endif
+#asm("cli")
+--rx_counter0;
+#asm("sei")
+return data;
+}
+#pragma used-
+#endif
+#include <stdio.h>
+
+void main(void)
+{
+// Crystal Oscillator division factor: 1
+#pragma optsize-
+CLKPR=(1<<CLKPCE);
+CLKPR=(0<<CLKPCE) | (0<<CLKPS3) | (0<<CLKPS2) | (0<<CLKPS1) | (0<<CLKPS0);
+#ifdef _OPTIMIZE_SIZE_
+#pragma optsize+
+#endif
+
+// USART initialization
+UCSR0A=0x00;
+UCSR0B=0x90;
+UCSR0C=0x06;
+UBRR0H=0x00;
+UBRR0L=0x33;
+
+BTN_DDR = 0xff;
+BTN_PORT = 0xff;
+
+// Global enable interrupts
+#asm("sei")
+
+while (1)
+      {    
+          UDR0 = getchar();  
+          data = UDR0;  
+          if(data == 'r')
+          {
+               RES_PORT = 0;   
+          }
+          else if(data == 's')
+          {
+               SET_PORT = 0; 
+          }
+          else if(data == 'p')
+          {
+               CANCEL_PORT = 0;  
+          }
+          else if(data == 'c')
+          {
+               CC_PORT = 0;  
+          }
+          else if(data == 'a')
+          {
+               ACC_PORT = 0; 
+          }
+          delay_ms(200);    
+          BTN_PORT = 0xff;  
+      }
+}

@@ -1,0 +1,17 @@
+RAM Allocation
+Variable                                                          Address   Size
+--------------------------------------------------------------------------------
+rx_buffer0                                                        0x0300       8
+
+EEPROM Allocation
+Variable                                                          Address   Size
+--------------------------------------------------------------------------------
+
+Register Allocation
+Variable                                                          Register  Size
+--------------------------------------------------------------------------------
+data                                                              R4           1
+rx_wr_index0                                                      R3           1
+rx_rd_index0                                                      R6           1
+rx_counter0                                                       R5           1
+rx_buffer_overflow0                                               GPIOR0.0  1bit

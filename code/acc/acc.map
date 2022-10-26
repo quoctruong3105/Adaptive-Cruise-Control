@@ -1,0 +1,24 @@
+RAM Allocation
+Variable                                                          Address   Size
+--------------------------------------------------------------------------------
+timerOverFlow                                                     0x0358       2
+_base_y                                                           0x035A       4
+_lcd_x                                                            0x035E       1
+_lcd_y                                                            0x035F       1
+_lcd_maxx                                                         0x0360       1
+_seed                                                             0x0361       4
+
+EEPROM Allocation
+Variable                                                          Address   Size
+--------------------------------------------------------------------------------
+
+Register Allocation
+Variable                                                          Register  Size
+--------------------------------------------------------------------------------
+mode                                                              R4           1
+status                                                            R3           1
+dem                                                               R5,R6        2
+gapLevel                                                          R7,R8        2
+speed                                                             R9,R10       2
+speedTemp                                                         R11,R12      2
+distance                                                          R13,R14      2
